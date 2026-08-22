@@ -1,0 +1,10 @@
+﻿opencv-python
+mediapipe
+numpy
+pillow
+customtkinter
+python-dotenv
+google-genai
+openai
+requests
+pyttsx3
