@@ -3,18 +3,345 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kinetiq AI - Edge Biomechanics</title>
+  <title>Kinetiq AI - Edge Biomechanics & Nutrition Engine</title>
+  
+  <!-- MediaPipe Pose & Camera Utilities (Client-side Edge Vision) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
   <style>
-    body { background-color: #070b12; color: #f8fafc; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .card { background-color: #0e1526; border: 1px solid #1e293b; border-radius: 12px; padding: 2rem; max-width: 500px; text-align: center; }
-    h1 { color: #06b6d4; }
-    p { color: #94a3b8; line-height: 1.5; }
+    :root {
+      --bg: #070b12;
+      --card-bg: #0e1526;
+      --accent: #06b6d4;
+      --accent-green: #10b981;
+      --accent-orange: #f59e0b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #1e293b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.25rem; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+    header .status { font-size: 0.85rem; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr 340px;
+      gap: 16px;
+      padding: 16px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    /* Left Panel Buttons & Metrics */
+    .mode-btn {
+      background: #1e293b;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: 0.2s;
+    }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+    .metric-card {
+      background: #161f36;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .metric-card span { font-size: 0.75rem; color: var(--muted); display: block; }
+    .metric-card strong { font-size: 1.1rem; color: var(--text); }
+
+    /* Center Video Stream */
+    .video-container {
+      position: relative;
+      flex: 1;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video { display: none; }
+    canvas { width: 100%; height: 100%; object-fit: cover; }
+    .banner {
+      background: #1e293b;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    /* Right Panel Chat */
+    .chat-box {
+      flex: 1;
+      background: #161f36;
+      border-radius: 8px;
+      padding: 12px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .msg-bot { color: #38bdf8; }
+    .msg-user { color: #f8fafc; font-weight: 600; }
+    .chat-input-row {
+      display: flex;
+      gap: 6px;
+    }
+    .chat-input-row input {
+      flex: 1;
+      background: #161f36;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      outline: none;
+    }
+    .chat-input-row button {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 0 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Kinetiq AI</h1>
-    <p>Real-Time Edge Biomechanics & Injury Prevention Engine.</p>
+
+  <header>
+    <h1>⚡ Kinetiq AI</h1>
+    <div class="status">● Edge Kinematics Online (WASM)</div>
+  </header>
+
+  <div class="main-grid">
+    <!-- LEFT PANEL: CONTROLS & TELEMETRY -->
+    <div class="panel">
+      <div class="panel-title">Movement Protocols</div>
+      <button class="mode-btn active" onclick="setExercise('squat', this)">SQUATS</button>
+      <button class="mode-btn" onclick="setExercise('pushup', this)">PUSH-UPS</button>
+      <button class="mode-btn" onclick="setExercise('pullup', this)">PULL-UPS</button>
+      <button class="mode-btn" onclick="setExercise('curl', this)">BICEP CURLS</button>
+
+      <div class="panel-title" style="margin-top: 12px; color: var(--accent-orange);">Fatigue & Integrity</div>
+      <div class="metric-card">
+        <span>Form Integrity Score</span>
+        <strong id="m-score" style="color: var(--accent-green);">100%</strong>
+      </div>
+      <div class="metric-card">
+        <span>Concentric Velocity Loss</span>
+        <strong id="m-vloss" style="color: #38bdf8;">0.0%</strong>
+      </div>
+      <div class="metric-card">
+        <span>Kinetic Collapse Point</span>
+        <strong id="m-collapse" style="color: var(--accent-green);">Stable Execution</strong>
+      </div>
+    </div>
+
+    <!-- CENTER PANEL: LIVE VIDEO HUD -->
+    <div class="panel" style="flex: 1;">
+      <div class="video-container">
+        <video id="webcam" playsinline></video>
+        <canvas id="output_canvas"></canvas>
+      </div>
+      <div class="banner" id="status-banner">Align inside camera frame to calibrate...</div>
+    </div>
+
+    <!-- RIGHT PANEL: AI SPOTTER & DIET -->
+    <div class="panel">
+      <div class="panel-title" style="color: #8b5cf6;">AI Spotter & Indigenous Nutrition</div>
+      <div class="chat-box" id="chat-box">
+        <div class="msg-bot">Kinetiq AI: Camera connected. Perform your repetitions for live joint telemetry and form diagnosis.</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask about Sattu macros or form..." onkeydown="if(event.key==='Enter') sendChat()">
+        <button onclick="sendChat()">➤</button>
+      </div>
+    </div>
   </div>
+
+  <script>
+    let currentEx = 'squat';
+    let reps = 0;
+    let stage = 'UP';
+    let minAngle = 180;
+    let inflectionTime = null;
+    let baselineTime = null;
+    let telemetry = [];
+
+    const exConfigs = {
+      squat: { target: 90, up: 160, label: "Knee Angle" },
+      pushup: { target: 90, up: 155, label: "Elbow Angle" },
+      pullup: { target: 70, up: 155, label: "Elbow Angle" },
+      curl: { target: 45, up: 150, label: "Elbow Bend" }
+    };
+
+    function setExercise(name, btn) {
+      currentEx = name;
+      reps = 0;
+      stage = 'UP';
+      minAngle = 180;
+      baselineTime = null;
+      telemetry = [];
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('status-banner').innerText = `Switched to ${name.toUpperCase()}`;
+    }
+
+    function calculateAngle(a, b, c) {
+      const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+      let angle = Math.abs(radians * 180.0 / Math.PI);
+      if (angle > 180.0) angle = 360.0 - angle;
+      return Math.round(angle);
+    }
+
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    function onResults(results) {
+      canvasElement.width = videoElement.videoWidth || 640;
+      canvasElement.height = videoElement.videoHeight || 480;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.poseLandmarks) {
+        const lm = results.poseLandmarks;
+        let angle = 180;
+
+        if (currentEx === 'squat') {
+          angle = calculateAngle(lm[24], lm[26], lm[28]); // Hip, Knee, Ankle
+        } else {
+          angle = calculateAngle(lm[12], lm[14], lm[16]); // Shoulder, Elbow, Wrist
+        }
+
+        const cfg = exConfigs[currentEx];
+        if (angle < minAngle) minAngle = angle;
+
+        if (angle <= cfg.target && stage === 'UP') {
+          stage = 'DOWN';
+          inflectionTime = performance.now();
+          document.getElementById('status-banner').innerText = "Optimal Depth Reached! Drive Up";
+          document.getElementById('status-banner').style.color = "#10b981";
+        } else if (angle >= cfg.up && stage === 'DOWN') {
+          stage = 'UP';
+          reps++;
+          const duration = (performance.now() - inflectionTime) / 1000;
+          if (!baselineTime) baselineTime = duration;
+
+          const vloss = Math.max(0, ((duration - baselineTime) / baselineTime) * 100).toFixed(1);
+          let repScore = 100;
+          if (minAngle > cfg.target) repScore = Math.max(40, 100 - (minAngle - cfg.target) * 3);
+
+          telemetry.push({ rep: reps, score: repScore, vloss: vloss });
+          document.getElementById('m-vloss').innerText = `${vloss}%`;
+          document.getElementById('status-banner').innerText = `Rep #${reps} Logged! (V-Loss: ${vloss}%)`;
+          document.getElementById('status-banner').style.color = "#06b6d4";
+
+          minAngle = 180;
+        }
+
+        // Draw Skeletal Points
+        for (const pt of lm) {
+          canvasCtx.beginPath();
+          canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 4, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = '#06b6d4';
+          canvasCtx.fill();
+        }
+      }
+      canvasCtx.restore();
+    }
+
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    pose.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => { await pose.send({ image: videoElement }); },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+
+    function sendChat() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const chatBox = document.getElementById('chat-box');
+      chatBox.innerHTML += `<div class="msg-user">You: ${text}</div>`;
+      input.value = "";
+
+      let reply = "Maintain core intra-abdominal pressure and complete reps before velocity drops >20%.";
+      const q = text.toLowerCase();
+      if (q.includes("sattu")) {
+        reply = "🌾 Sattu Profile: 50g provides 13g bioavailable plant protein. Pair with buttermilk and roasted jeera for rapid recovery.";
+      } else if (q.includes("ragi")) {
+        reply = "🥣 Ragi Mudde: Rich in bioavailable calcium (344mg/100g), strengthening bone mineral density against heavy loads.";
+      } else if (q.includes("knee") || q.includes("valgus")) {
+        reply = "🦵 Drive your knees outward along the line of your toes to activate the gluteus medius.";
+      }
+
+      setTimeout(() => {
+        chatBox.innerHTML += `<div class="msg-bot">Kinetiq AI: ${reply}</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, 400);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
 </body>
 </html>
